@@ -1,0 +1,48 @@
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: finai-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-financial_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-finai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/docker/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  
+  redis:
+    image: redis:7-alpine
+    container_name: finai-redis
+    command: >
+      redis-server
+        --appendonly yes
+        --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+        -- maxmemory ${REDIS_MAXMEMORY:-256mb}
+        --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: finai_postgres_data
+  redis_data:
+    name: finai_redis_data
+
+  
