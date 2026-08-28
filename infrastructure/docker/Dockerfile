@@ -11,20 +11,16 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Copy dependency files
+# Copy ONLY pyproject.toml (remove README.md)
 COPY pyproject.toml ./
-# Only copy README if it exists, or remove this line
-# COPY README.md ./
 
 # Create virtual environment and install dependencies
 RUN python -m venv /app/venv && \
     /app/venv/bin/pip install --upgrade pip setuptools wheel && \
     /app/venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu --no-cache-dir
 
-# Install the package (try editable install first)
-RUN /app/venv/bin/pip install -e . --no-cache-dir --timeout 1000 || \
-    /app/venv/bin/pip install . --no-cache-dir --timeout 1000 || \
-    /app/venv/bin/pip install -r requirements.txt --no-cache-dir --timeout 1000
+# Install dependencies from pyproject.toml without installing the package itself
+RUN /app/venv/bin/pip install $(/app/venv/bin/python -c "import tomllib; print(' '.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))") --no-cache-dir --timeout 1000
 
 # Copy source code
 COPY src/ ./src/
@@ -49,7 +45,6 @@ RUN groupadd -r finrag && useradd -r -g finrag finrag && \
 # Copy virtual environment and source code from builder
 COPY --from=builder --chown=finrag:finrag /app/venv /app/venv
 COPY --from=builder --chown=finrag:finrag /app/src /app/src
-COPY --from=builder --chown=finrag:finrag /app/pyproject.toml /app/pyproject.toml
 
 ENV PATH="/app/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \

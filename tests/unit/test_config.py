@@ -215,6 +215,8 @@ class TestSecretSafety:
 
     def test_redis_password_not_in_repr(self, test_settings):
         raw = test_settings.REDIS_PASSWORD.get_secret_value()
+        if not raw:
+            pytest.skip("Redis pasword not set in test")
         assert raw not in repr(test_settings.REDIS_PASSWORD)
 
     def test_secret_value_accessible_when_needed(self, test_settings):
