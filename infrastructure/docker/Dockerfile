@@ -11,21 +11,23 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# 1. Copy dependency files - remove README.md if it doesn't exist
+# Copy dependency files
 COPY pyproject.toml ./
+# Only copy README if it exists, or remove this line
+# COPY README.md ./
 
-# 2. Create virtual environment and install dependencies
+# Create virtual environment and install dependencies
 RUN python -m venv /app/venv && \
     /app/venv/bin/pip install --upgrade pip setuptools wheel && \
-    /app/venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu --no-cache-dir && \
-    /app/venv/bin/pip install . --no-cache-dir --timeout 1000
+    /app/venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu --no-cache-dir
 
-# 3. Copy source code
+# Install the package (try editable install first)
+RUN /app/venv/bin/pip install -e . --no-cache-dir --timeout 1000 || \
+    /app/venv/bin/pip install . --no-cache-dir --timeout 1000 || \
+    /app/venv/bin/pip install -r requirements.txt --no-cache-dir --timeout 1000
+
+# Copy source code
 COPY src/ ./src/
-
-# Run a final editable install
-RUN /app/venv/bin/pip install --no-deps -e "."
-
 
 # ── Stage 2: production ───────────────────────────────────────────────────────
 FROM python:3.11-slim-bookworm AS production
@@ -65,7 +67,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 EXPOSE 8000
 
-# FIXED: Changed from financial_rag to financial_ai
 CMD ["uvicorn", "financial_ai.api.server:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \

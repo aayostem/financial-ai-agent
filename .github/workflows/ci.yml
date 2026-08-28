@@ -154,8 +154,7 @@ jobs:
           -f infrastructure/docker/init/01_create_schema.sql
       - name: Wait for services with dockerize
         run: |
-          dockerize -wait tcp://localhost:5432 -timeout 30s
-          dockerize -wait tcp://localhost:6379 -timeout 30s
+          sleep 10
       - name: Run tests
         env:
           APP_ENV: testing
