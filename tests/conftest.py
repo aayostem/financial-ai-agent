@@ -17,6 +17,15 @@ def clear_settings_cache():
     yield
     get_settings.cache_clear()
     
+@pytest.fixture(autouse=True)
+def mock_tiktoken():
+    """Prevent tiktoken from trying to download bpe files during unit tests."""
+    with patch("tiktoken.get_encoding") as mock_get:
+        mock_encoding = mock_get.return_value
+        mock_encoding.encode.return_value = [1, 2, 3]
+        mock_encoding.decode.return_value = "mock decoded text"
+        yield mock_get
+    
 @pytest.fixture
 def test_env():
     with patch.dict(os.environ, VALID_SECRETS, clear=False):

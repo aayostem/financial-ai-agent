@@ -132,7 +132,7 @@ class QueryEngine:
 
         try:
             # step 1: retrieve
-            results = await self.retrieve(
+            results = await self._retrieve(
                 question,
                 ticker=ticker,
                 filing_type=filing_type,

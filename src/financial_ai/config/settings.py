@@ -240,6 +240,8 @@ class Settings(BaseSettings):
                 )
             if self.DEBUG:
                 issues.append("DEBUG=True in production.")
+            if not self.POSTGRES_HOST or self.POSTGRES_HOST == "localhost":
+                issues.append("POSTGRES_HOST is 'localhost' - use a real host in production")
 
         if issues:
             raise ValueError(
