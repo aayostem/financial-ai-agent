@@ -230,7 +230,7 @@ class QueryEngine:
         limit: int | None,
     ) -> list[RetrievalResult]:
         if search_type == "hybrid":
-            return await self._hybrid_search(
+            return await self._hybrid.search(
                 question,
                 ticker=ticker,
                 filing_type=filing_type,

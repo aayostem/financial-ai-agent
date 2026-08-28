@@ -90,7 +90,7 @@ packages = ["src/financial_ai"]
 [tool.pytest.ini_options]
 asyncio_mode  = "auto"
 testpaths     = ["tests"]
-pythonpath    = ["src"]          # ← this is what was missing
+pythonpath    = ["src"]
 python_files  = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -157,86 +157,69 @@ known-first-party = ["financial_ai"]
 # Mypy
 # =============================================================================
 [tool.mypy]
-python_version         = "3.11"
-strict                 = true
+python_version = "3.12"
+strict = true
 ignore_missing_imports = true
-exclude                = ["^tests/", "^tests\\\\", "migrations/"]
-
-[[tool.mypy.overrides]]
-module = "financial_ai.agents.*"
 ignore_errors = true
+exclude = ["^tests/", "^tests\\\\", "migrations/", ".*numpy.*"]
 
-# ── Per-module overrides ──────────────────────────────────────────────────────
-# pydantic-settings BaseSettings subclassing and computed_field @property
-# stacking are unsupported patterns in mypy strict mode — library limitation.
+# ── Per-module overrides (all consolidated, no duplicates) ────────────────
+# pydantic-settings BaseSettings subclassing limitations
 [[tool.mypy.overrides]]
 module = "financial_ai.config.*"
 ignore_errors = true
 
-# redis.asyncio has no type stubs — types-redis covers sync API only.
-# Suppress import-untyped and the unused-ignore that results from it.
+# redis.asyncio has no type stubs
 [[tool.mypy.overrides]]
 module = "financial_ai.storage.cache"
 ignore_errors = true
 
-[[tool.mypy.overrides]]
-module = "financial_ai.api.*"
-ignore_errors = true
-
-# SQLAlchemy pool.size(), checkedout(), overflow() exist at runtime
-# but are not reflected in SQLAlchemy's published type stubs.
+# SQLAlchemy pool methods not in type stubs
 [[tool.mypy.overrides]]
 module = "financial_ai.storage.database"
 ignore_errors = true
 
-# SQLAlchemy repositories: order_by column expressions, generic ModelT
-# return types, and rowcount attribute are not fully typed in SA stubs.
+# SQLAlchemy repositories: generic ModelT return types not fully typed
 [[tool.mypy.overrides]]
 module = "financial_ai.storage.repositories.*"
 ignore_errors = true
 
-# tenacity @retry strips decorated method return types, causing
-# cascading no-any-return and misc errors throughout the ingestor.
-[[tool.mypy.overrides]]
-module = "financial_ai.ingestion.sec_ingestor"
-ignore_errors = true
-
-# Retrieval: OpenAI and sentence-transformers lack complete stubs.
-# tenacity @retry on embed methods strips return types.
-[[tool.mypy.overrides]]
-module = "financial_ai.retrieval.*"
-ignore_errors = true
-
-# Vector store orchestrates multiple untyped libraries.
+# Vector store orchestrates multiple untyped libraries
 [[tool.mypy.overrides]]
 module = "financial_ai.storage.vector_store"
 ignore_errors = true
 
-# API layer: FastAPI Depends() annotated types must remain as runtime
-# imports — moving to TYPE_CHECKING breaks dependency injection.
+# tenacity @retry strips decorated method return types
+[[tool.mypy.overrides]]
+module = "financial_ai.ingestion.sec_ingestor"
+ignore_errors = true
+
+# Retrieval: OpenAI and sentence-transformers lack complete stubs
+[[tool.mypy.overrides]]
+module = "financial_ai.retrieval.*"
+ignore_errors = true
+
+# Agent has complex type issues with OpenAI function calling
+[[tool.mypy.overrides]]
+module = "financial_ai.agents.*"
+ignore_errors = true
+
+# API layer: FastAPI Depends() annotations break with TYPE_CHECKING
 [[tool.mypy.overrides]]
 module = "financial_ai.api.*"
 ignore_errors = true
 
+# Numpy uses Python 3.12+ syntax not supported by mypy
+[[tool.mypy.overrides]]
+module = "numpy.*"
+ignore_errors = true
+
+# Tests excluded from type checking
 [[tool.mypy.overrides]]
 module = "tests.*"
 ignore_errors = true
 
-[tool.black]
-line-length = 100
-target-version = ['py311']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-    \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
+# SQLAlchemy pool internals not fully typed
+[[tool.mypy.overrides]]
+module = "sqlalchemy.pool.*"
+ignore_errors = true

@@ -64,7 +64,7 @@ class HybridSearcher:
         # Fuse results using RRF
         fused = self._reciprocal_rank_fusion(
             vector_results=vector_results,
-            text_result=text_results,
+            text_results=text_results,
             alpha=effective_alpha,
             limit=effective_limit,
         )
@@ -160,7 +160,7 @@ class HybridSearcher:
                 select(ChunkModel).where(ChunkModel.id.in_(chunk_ids))
             )
             chunks = {c.id: c for c in chunks_result.scalars().all()}
-            return [{chunks[cid], score_map[cid]} for cid in chunk_ids if cid in chunks]
+            return [(chunks[cid], score_map[cid]) for cid in chunk_ids if cid in chunks]
 
     # RRF fusion
 

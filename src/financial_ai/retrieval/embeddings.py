@@ -7,6 +7,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from financial_ai.config import get_settings
 from financial_ai.utils.exceptions import EmbeddingError
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +262,7 @@ class EmbeddingClient:
 
         return all_embeddings
 
-    async def embed_chunks(self, chunks: list) -> list:
+    async def embed_chunks(self, chunks: list[Any]) -> list[Any]:
         if not chunks:
             return []
 

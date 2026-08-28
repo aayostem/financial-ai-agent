@@ -75,6 +75,8 @@ class CacheClient:
         logger.info("Redis connection pool closed")
 
     async def get(self, key: str) -> Any | None:
+        self._assert_connected()
+        assert self._redis is not None
         try:
             raw = await self._redis.get(key)
             if raw is None:
@@ -89,6 +91,7 @@ class CacheClient:
 
     async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         self._assert_connected()
+        assert self._redis is not None
         settings = get_settings()
         effective_ttl = ttl if ttl is not None else settings.REDIS_DEFAULT_TTL_SECONDS
 
@@ -107,6 +110,8 @@ class CacheClient:
             raise CacheOperationError(f"SET {key} failed: {exc}") from exc
 
     async def delete(self, key: str) -> bool:
+        self._assert_connected()
+        assert self._redis is not None
         try:
             deleted = await self._redis.delete(key)
             return bool(deleted)
@@ -115,6 +120,8 @@ class CacheClient:
             raise CacheOperationError(f"DELETE {key} failed: {exc}") from exc
 
     async def exists(self, key: str) -> bool:
+        self._assert_connected()
+        assert self._redis is not None
         try:
             return bool(await self._redis.exists(key))
         except RedisError as exc:
@@ -122,6 +129,7 @@ class CacheClient:
 
     async def expire(self, key: str, ttl: int) -> bool:
         self._assert_connected()
+        assert self._redis is not None
         try:
             return bool(await self._redis.expire(key, ttl))
         except RedisError as exc:
@@ -129,6 +137,7 @@ class CacheClient:
 
     async def clear_namespace(self, namespace: str) -> int:
         self._assert_connected()
+        assert self._redis is not None
         pattern = f"finai:{namespace}:*"
         deleted = 0
         try:

@@ -206,7 +206,7 @@ class FinancialAgent:
 
         try:
             answer, sources, tool_calls, steps = await self._run_agent_loop(
-                question,
+                question=question,
                 ticker=ticker,
                 fiscal_year=fiscal_year,
                 analysis_style=analysis_style,
@@ -259,7 +259,7 @@ class FinancialAgent:
         if fiscal_year:
             context_hints.append(f"Fiscal year: {fiscal_year}")
         if context_hints:
-            user_content = f"[{', '.json(context_hints)}]\n\n{question}"
+            user_content = f"[{', '.join(context_hints)}]\n\n{question}"
         else:
             user_content = question
 
@@ -320,6 +320,27 @@ class FinancialAgent:
             all_tool_calls,
             reasoning_steps,
         )
+    async def _execute_tool(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        ticker: str | None,
+        fiscal_year: int | None,
+    ) -> tuple[str, list[RetrievalResult]]:
+        try:
+            if tool_name == "search_filings":
+                return await self._tool_search_filings(
+                    args, default_ticker=ticker, default_year=fiscal_year
+                )
+            elif tool_name == "compare_filings":
+                return await self._tool_compare_filings(args)
+            else:
+                return f"Unknown tool: {tool_name}", []
+        except Exception as exc:
+            logger.warning("Tool %s failed: %s", tool_name, exc)
+            return f"Tool call failed: {exc}", []
+    
 
     async def _tool_search_filings(
         self, args: dict[str, Any], *, default_ticker: str | None, default_year: int | None

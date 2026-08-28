@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
@@ -112,7 +113,7 @@ class DatabaseClient:
                 await session.close()
 
     @asynccontextmanager
-    async def connection(self) -> AsyncGenerator[AsyncGenerator, None]:
+    async def connection(self) -> AsyncGenerator[AsyncConnection, None]:
         if self._engine is None:
             raise DatabaseConnectionError("DatabaseClient is not connected. call connect() first")
         async with self._engine.begin() as conn:
@@ -124,7 +125,7 @@ class DatabaseClient:
             return {"status": "disconnected", "error": "client not initialized"}
 
         try:
-            async with self._engine_connect() as conn:
+            async with self._engine.connect() as conn:
                 row = await conn.execute(text("SELECT version(), pg_postmaster_start_time()"))
                 version, start_time = row.one()
 

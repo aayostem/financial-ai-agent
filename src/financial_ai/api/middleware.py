@@ -85,7 +85,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         settings = get_settings()
-        if not settings.API_KEY_ENABLED or request.url.pth in self.EXEMPT_PATHS:
+        if not settings.API_KEY_ENABLED or request.url.path in self.EXEMPT_PATHS:
             return await call_next(request)
 
         api_key = request.headers.get("X-API-Key")
