@@ -152,6 +152,10 @@ jobs:
         run: |
           psql -h localhost -U finai -d financial_ai_test \
           -f infrastructure/docker/init/01_create_schema.sql
+      - name: Wait for services with dockerize
+        run: |
+          dockerize -wait tcp://localhost:5432 -timeout 30s
+          dockerize -wait tcp://localhost:6379 -timeout 30s
       - name: Run tests
         env:
           APP_ENV: testing
@@ -161,7 +165,7 @@ jobs:
           POSTGRES_DB: financial_ai_test
           REDIS_HOST: localhost
           REDIS_PASSWORD: ""
-        run: pytest tests/ -v --tb=short -x -m "not slow"
+        run: pytest tests/ -v --tb=short -m "not slow"
 
   # BUILD & PUSH DOCKER IMAGE
   build:
