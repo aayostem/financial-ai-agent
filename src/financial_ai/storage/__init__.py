@@ -6,7 +6,7 @@ from .cache import (
     NS_QUERY,
     CacheClient,
     build_key,
-    get_cache_client
+    get_cache_client,
 )
 from .database import Base, DatabaseClient, get_db_client, get_session
 

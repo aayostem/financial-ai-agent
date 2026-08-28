@@ -3,12 +3,7 @@ from __future__ import annotations
 import logging
 import time
 
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential
-)
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from financial_ai.config import get_settings
 from financial_ai.utils.exceptions import EmbeddingError
@@ -161,7 +156,7 @@ class LocalEmbeddingProvider(EmbeddingProvider):
             raise ImportError(
                 "sentence-transformers is required for local embeddings. "
                 "Install it with: pip install sentence-transformers"
-            )
+            ) from e
         
         settings = get_settings()
         
@@ -233,7 +228,7 @@ class EmbeddingClient:
         
         if provider_name == "openai":
             if not settings.OPENAI_API_KEY:
-                if not settings.APP_ENV in ("development", "testing"):
+                if settings.APP_ENV not in ("development", "testing"):
                     logger.warning(
                         "OPENAI_API_KEY not set - falling back to local "
                         "embedding provider for %s environment",

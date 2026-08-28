@@ -7,12 +7,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 import httpx
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential
-)
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from financial_ai.config import get_settings
 from financial_ai.utils.exceptions import SECFetchError

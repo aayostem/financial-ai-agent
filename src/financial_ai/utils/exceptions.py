@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 class FinAIError(Exception):
     def __init__(self, message: str, *, cause: BaseException | None = None) -> None:
         super().__init__(message)

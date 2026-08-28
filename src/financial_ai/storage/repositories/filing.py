@@ -68,7 +68,7 @@ class FilingsRepository(BaseRepository[Filing]):
         except Exception as exc:
             raise DatabaseQueryError(
                 f"Failed to fetch filings for ticker '{ticker}': {exc}"
-            )
+            ) from exc
             
     async def get_by_ticker_and_type(self, ticker: str, filing_type: str, *, fiscal_year: int | None = None, active_only: bool = True) -> list[Filing]:
         try:

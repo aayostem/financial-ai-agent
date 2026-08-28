@@ -4,7 +4,7 @@ import logging
 from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import (Float, Integer, SmallInteger, String, Text, func, select, text)
+from sqlalchemy import Float, Integer, SmallInteger, String, Text, func, select, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -134,7 +134,7 @@ class ChunksRepository(BaseRepository[FinancialChunk]):
                     
                 if mmr_score > best_score:
                     best_score = mmr_score
-                    best_idx = 1
+                    best_idx = i
                     
             selected.append(remaining.pop(best_idx))
         return selected

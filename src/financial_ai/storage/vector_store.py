@@ -61,7 +61,7 @@ class VectorStore:
         import uuid as uuid_module
         filing_id = uuid_module.uuid4()
         
-        async with db.session() as Session:
+        async with db.session() as session:
             filings_repo = FilingsRepository(session)
             filing = Filing(
                 id=filing_id,

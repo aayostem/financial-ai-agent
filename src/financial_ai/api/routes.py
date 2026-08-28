@@ -14,7 +14,7 @@ from financial_ai.api.models import (
     QueryRequest,
     QueryResponse,
     ServiceStatus,
-    StatsResponse
+    StatsResponse,
 )
 from financial_ai.ingestion.parsers.html_parser import HTMLParser
 from financial_ai.ingestion.parsers.text_parser import TextParser

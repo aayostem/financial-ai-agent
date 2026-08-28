@@ -135,7 +135,7 @@ class HybridSearcher:
                     id,
                     similarity(chunk_text, :query) AS trgm_score
                 FROM financial_chunks
-                (where_clause)
+                {where_clause}
                 ORDER BY trgm_score DESC
                 LIMIT :limit           
             """)

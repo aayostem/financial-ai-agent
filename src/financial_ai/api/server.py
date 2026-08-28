@@ -11,15 +11,12 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from financial_ai.api.dependencies import (
-    initialize_dependencies,
-    shutdown_dependencies
-)
+from financial_ai.api.dependencies import initialize_dependencies, shutdown_dependencies
 from financial_ai.api.middleware import (
     APIKeyMiddleware,
     RequestLoggingMiddleware,
     configure_limiter,
-    register_exception_handlers
+    register_exception_handlers,
 )
 from financial_ai.api.routes import router
 from financial_ai.config import get_settings

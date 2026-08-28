@@ -256,7 +256,8 @@ class QueryEngine:
         context: str,
         analysis_style: str
     ) -> str:
-        if self._llm is None:return f"[LLM unavailable - returning raw context]\n\n{context}"
+        if self._llm is None:
+            return f"[LLM unavailable - returning raw context]\n\n{context}"
         
         system_prompt = _SYSTEM_PROMPTS.get(analysis_style, _SYSTEM_PROMPTS[_DEFAULT_STYLE])
         

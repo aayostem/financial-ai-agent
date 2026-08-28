@@ -215,11 +215,11 @@ class FinancialAgent:
             
             return AgentResult(
                 question=question,
-                answer=result.answer,
+                answer=answer,
                 analysis_style=analysis_style,
                 agent_type="query_engine_fallback",
                 latency_ms=int((time.monotonic() - t0) * 1000),
-                source_documents=result.source_documents,
+                source_documents=sources,
                 tool_calls=tool_calls,
                 reasoning_steps=steps
             )
@@ -387,7 +387,7 @@ class FinancialAgent:
                 if result.source_documents:
                     all_sources.extend(result.source_documents)
                     chunks = [r.to_context_string() for r in result.source_documents[:2]]
-                    year_contexts.append(f"===FY(year) ===\n" + "\n".join(chunks))
+                    year_contexts.append("===FY(year) ===\n" + "\n".join(chunks))
         else:
             result = await self._query_engine.query(query, ticker=ticker, analysis_style="analyst")
             all_sources = result.source_documents
