@@ -15,6 +15,7 @@ from financial_ai.storage.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class AgentResult:
     """
@@ -48,6 +49,7 @@ class AgentResult:
             source_documents=self.source_documents,
             error=self.error,
         )
+
 
 # SYSTEM PROMPT
 _SYSTEM_PROMPTS: dict[str, str] = {
@@ -157,13 +159,14 @@ _TOOLS = [
     },
 ]
 
+
 class FinancialAgent:
     def __init__(self, vector_store: VectorStore | None = None) -> None:
         self._settings = get_settings()
-        vs =vector_store or VectorStore()
+        vs = vector_store or VectorStore()
         self._query_engine = QueryEngine(vector_store=vs)
         self._llm = self._build_llm_client()
-        
+
     def _build_llm_client(self) -> AsyncOpenAI | None:
         if self._settings.MOCK_EXTERNAL_APIS:
             return None
@@ -173,9 +176,9 @@ class FinancialAgent:
         return AsyncOpenAI(
             api_key=self._settings.OPENAI_API_KEY.get_secret_value(),
             base_url=self._settings.LLM_BASE_URL or None,
-            timeout=self._settings.LLM_REQUEST_TIMEOUT
+            timeout=self._settings.LLM_REQUEST_TIMEOUT,
         )
-    
+
     async def analyze(
         self,
         question: str,
@@ -183,16 +186,13 @@ class FinancialAgent:
         ticker: str | None,
         fiscal_year: int | None,
         analysis_style: Literal["analyst", "executive", "risk"] = "analyst",
-        max_tool_calls: int = 5
+        max_tool_calls: int = 5,
     ) -> AgentResult:
         t0 = time.monotonic()
-        
+
         if self._llm is None:
             result = await self._query_engine.query(
-                question,
-                ticker=ticker,
-                fiscal_year=fiscal_year,
-                analysis_style=analysis_style
+                question, ticker=ticker, fiscal_year=fiscal_year, analysis_style=analysis_style
             )
             return AgentResult(
                 question=question,
@@ -201,18 +201,18 @@ class FinancialAgent:
                 agent_type="query_engine_fallback",
                 latency_ms=int((time.monotonic() - t0) * 1000),
                 source_documents=result.source_documents,
-                error=result.error
+                error=result.error,
             )
-        
+
         try:
             answer, sources, tool_calls, steps = await self._run_agent_loop(
                 question,
                 ticker=ticker,
                 fiscal_year=fiscal_year,
                 analysis_style=analysis_style,
-                max_tool_calls=max_tool_calls
+                max_tool_calls=max_tool_calls,
             )
-            
+
             return AgentResult(
                 question=question,
                 answer=answer,
@@ -221,7 +221,7 @@ class FinancialAgent:
                 latency_ms=int((time.monotonic() - t0) * 1000),
                 source_documents=sources,
                 tool_calls=tool_calls,
-                reasoning_steps=steps
+                reasoning_steps=steps,
             )
         except Exception as exc:
             logger.error("Agent loop failed: %s", exc, exc_info=True)
@@ -231,7 +231,7 @@ class FinancialAgent:
                 fiscal_year=fiscal_year,
                 analysis_style=analysis_style,
             )
-            
+
             return AgentResult(
                 question=question,
                 answer=result.answer,
@@ -239,9 +239,9 @@ class FinancialAgent:
                 agent_type="query_engine_fallback",
                 latency_ms=int((time.monotonic() - t0) * 1000),
                 source_documents=result.source_documents,
-                error=str(exc)
+                error=str(exc),
             )
-        
+
     async def _run_agent_loop(
         self,
         *,
@@ -249,9 +249,9 @@ class FinancialAgent:
         ticker: str | None,
         fiscal_year: int | None,
         analysis_style: str,
-        max_tool_calls: int
+        max_tool_calls: int,
     ) -> tuple[str, list[RetrievalResult], list[dict], list[str]]:
-        
+
         system_prompt = _SYSTEM_PROMPTS.get(analysis_style, _SYSTEM_PROMPTS["analysis"])
         context_hints = []
         if ticker:
@@ -262,7 +262,7 @@ class FinancialAgent:
             user_content = f"[{', '.json(context_hints)}]\n\n{question}"
         else:
             user_content = question
-            
+
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
@@ -271,7 +271,7 @@ class FinancialAgent:
         all_tool_calls: list[dict[str, Any]] = []
         reasoning_steps: list[str] = []
         tool_call_count = 0
-        
+
         while tool_call_count < max_tool_calls:
             response = await self._llm.chat.completions.create(
                 model=self._settings.LLM_MODEL,
@@ -279,92 +279,73 @@ class FinancialAgent:
                 tools=_TOOLS,
                 tool_choice="auto",
                 temperature=self._settings.LLM_TEMPERATURE,
-                max_tokens=self._settings.LLM_MAX_TOKENS
+                max_tokens=self._settings.LLM_MAX_TOKENS,
             )
-            
+
             message = response.choices[0].message
-            
+
             # final answer
             if not message.tool_calls:
-                return (
-                    message.content or "",
-                    all_sources,
-                    all_tool_calls,
-                    reasoning_steps
-                )
-                
+                return (message.content or "", all_sources, all_tool_calls, reasoning_steps)
+
             messages.append(message.model_dump(exclude_unset=True))
-            
+
             for tc in message.tool_calls:
                 tool_call_count += 1
                 fn_name = tc.function.name
                 fn_args = json.loads(tc.function.arguments)
-                
+
                 logger.debug("Agent tool call: %s(%s)", fn_name, fn_args)
                 reasoning_steps.append(f"Calling {fn_name}: {fn_args.get('query', '')}")
-                
+
                 tool_result, sources = await self._execute_tool(
                     fn_name, fn_args, ticker=ticker, fiscal_year=fiscal_year
                 )
                 all_sources.extend(sources)
                 all_tool_calls.append(
-                    {
-                        "tool": fn_name,
-                        "args": fn_args,
-                        "result": tool_result[:500]
-                    }
+                    {"tool": fn_name, "args": fn_args, "result": tool_result[:500]}
                 )
-                
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "content": tool_result
-                    }
-                )
+
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": tool_result})
         logger.warning("Agent hit mx_tool_calls=%d, forcing final answer", max_tool_calls)
         final_response = await self._llm.chat.completions.create(
             model=self._settings.LLM_MODEL,
             messages=messages,
             temperature=self._settings.LLM_TEMPERATURE,
-            max_tokens=self._settings.LLM_MAX_TOKENS
+            max_tokens=self._settings.LLM_MAX_TOKENS,
         )
         return (
             final_response.choice[0].message.content or "",
             all_sources,
             all_tool_calls,
-            reasoning_steps
+            reasoning_steps,
         )
-        
+
     async def _tool_search_filings(
-        self,
-        args: dict[str, Any],
-        *,
-        default_ticker: str | None,
-        default_year: int | None
+        self, args: dict[str, Any], *, default_ticker: str | None, default_year: int | None
     ) -> tuple[str, list[RetrievalResult]]:
         query = args.get("query", "")
         ticker = args.get("ticker") or default_ticker
         section = args.get("section")
         fiscal_year = args.get("fiscal_year") or default_year
-        
+
         result = await self.query_engine.query(
             query,
             ticker=ticker,
             fiscal_year=fiscal_year,
             section=section if section else None,
             analysis_style="analyst",
-            search_type="similarity"            
+            search_type="similarity",
         )
-        
+
         if not result.source_documents:
             return "No relevant information found for this query.", []
-        
+
         context_parts = [r.to_context_string() for r in result.source_documents]
         context = "\n\n---\n\n".join(context_parts)
-        
+
         return context, result.source_documents
-    
+
     async def _tool_compare_filings(
         self,
         args: dict[str, Any],
@@ -372,17 +353,14 @@ class FinancialAgent:
         query = args.get("query", "")
         ticker = args.get("ticker")
         years = args.get("years") or []
-        
+
         all_sources: list[RetrievalResult] = []
         year_contexts: list[str] = []
-        
+
         if years:
             for year in years[:3]:
                 result = await self._query_engine.query(
-                    query,
-                    ticker=ticker,
-                    fiscal_year=year,
-                    analysis_style="analyst"
+                    query, ticker=ticker, fiscal_year=year, analysis_style="analyst"
                 )
                 if result.source_documents:
                     all_sources.extend(result.source_documents)
@@ -392,9 +370,8 @@ class FinancialAgent:
             result = await self._query_engine.query(query, ticker=ticker, analysis_style="analyst")
             all_sources = result.source_documents
             year_contexts = [r.to_context_string() for r in all_sources]
-            
+
         if not year_contexts:
             return "No Comparative data found.", []
-        
+
         return "\n\n".join(year_contexts), all_sources
-                

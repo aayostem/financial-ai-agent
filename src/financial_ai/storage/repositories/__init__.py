@@ -10,5 +10,5 @@ __all__ = [
     "ChunksRepository",
     "Filing",
     "FilingsRepository",
-    "FinancialChunk"
+    "FinancialChunk",
 ]

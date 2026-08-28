@@ -16,28 +16,30 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 # Namespace constants
-NS_CHUNKS="chunks"
-NS_EMBEDDINGS="embeddings"
-NS_QUERY="query"
-NS_ANALYSIS="analysis"
-NS_MARKET="market"
-NS_HEALTH="health"
+NS_CHUNKS = "chunks"
+NS_EMBEDDINGS = "embeddings"
+NS_QUERY = "query"
+NS_ANALYSIS = "analysis"
+NS_MARKET = "market"
+NS_HEALTH = "health"
+
 
 def build_key(*parts: str) -> str:
     return "finai:" + ":".join(parts)
+
 
 class CacheClient:
     def __init__(self) -> None:
         self._pool: ConnectionPool | None = None
         self._redis: Redis | None = None
-        
+
     async def connect(self) -> None:
         if self._redis is not None:
             logger.warning("CacheClient.client() called on already-connected client")
             return
-        
+
         settings = get_settings()
-        
+
         try:
             self._pool = ConnectionPool.from_url(
                 settings.REDIS_URL.get_secret_value(),
@@ -45,21 +47,23 @@ class CacheClient:
                 socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
                 socket_connect_timeout=settings.REDIS_CONNECT_TIMEOUT_SECONDS,
                 decode_responses=True,
-                health_check_interval=30
+                health_check_interval=30,
             )
             self._redis = Redis(connection_pool=self._pool)
-            
+
             await self._redis.ping()
             logger.info(
                 "Redis connection pool established - host=%s port=%d db=%d",
                 settings.REDIS_HOST,
                 settings.REDIS_PORT,
-                settings.REDIS_DB
+                settings.REDIS_DB,
             )
         except RedisError as exc:
             logger.error("Failed to connect to Redis: %s", exc)
-            raise CacheConnectionError(f"Cannot connect to Redis at {settings.REDIS_HOST}: {settings.REDIS_PORT} - {exc}") from exc
-        
+            raise CacheConnectionError(
+                f"Cannot connect to Redis at {settings.REDIS_HOST}: {settings.REDIS_PORT} - {exc}"
+            ) from exc
+
     async def disconnect(self) -> None:
         if self._redis is None:
             return
@@ -69,7 +73,7 @@ class CacheClient:
         self._redis = None
         self._pool = None
         logger.info("Redis connection pool closed")
-        
+
     async def get(self, key: str) -> Any | None:
         try:
             raw = await self._redis.get(key)
@@ -82,19 +86,15 @@ class CacheClient:
         except RedisError as exc:
             logger.error("Cache GET failed for key '%s':%s", key, exc)
             raise CacheOperationError(f"GET {key} failed: {exc}") from exc
-    
-    async def set(self, key: str, value: Any, ttl: int | None = None)-> bool:
+
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         self._assert_connected()
         settings = get_settings()
         effective_ttl = ttl if ttl is not None else settings.REDIS_DEFAULT_TTL_SECONDS
-        
+
         try:
             serialized = json.dumps(value, default=str)
-            await self._redis.setex(
-                name=key,
-                time=effective_ttl,
-                value=serialized
-            )
+            await self._redis.setex(name=key, time=effective_ttl, value=serialized)
             logger.debug("Cache SET key='%s' ttl=%ds", key, effective_ttl)
             return True
         except (TypeError, ValueError) as exc:
@@ -105,7 +105,7 @@ class CacheClient:
         except RedisError as exc:
             logger.error("Cache SET failed for key '%s': %s", key, exc)
             raise CacheOperationError(f"SET {key} failed: {exc}") from exc
-        
+
     async def delete(self, key: str) -> bool:
         try:
             deleted = await self._redis.delete(key)
@@ -113,22 +113,20 @@ class CacheClient:
         except RedisError as exc:
             logger.error("Cache DELETE failed for key '%s': %s", key, exc)
             raise CacheOperationError(f"DELETE {key} failed: {exc}") from exc
-        
+
     async def exists(self, key: str) -> bool:
         try:
             return bool(await self._redis.exists(key))
         except RedisError as exc:
             raise CacheOperationError(f"EXISTS {key} failed: {exc}") from exc
-        
+
     async def expire(self, key: str, ttl: int) -> bool:
         self._assert_connected()
         try:
-            return bool(
-                await self._redis.expire(key, ttl)
-            )
+            return bool(await self._redis.expire(key, ttl))
         except RedisError as exc:
             raise CacheOperationError(f"EXPIRE {key} failed: {exc}") from exc
-        
+
     async def clear_namespace(self, namespace: str) -> int:
         self._assert_connected()
         pattern = f"finai:{namespace}:*"
@@ -141,47 +139,46 @@ class CacheClient:
             return deleted
         except RedisError as exc:
             raise CacheOperationError(f"clear_namespace '{namespace}' failed: {exc}") from exc
-    
+
     # HEALTH
     async def health_check(self) -> dict[str, Any]:
         if self._redis is None:
             return {"status": "disconnected", "error": "Client not initialized"}
-        
+
         try:
             await self._redis.ping()
             info = await self._redis.info("server")
             pool_stats = self._pool_stats()
-            
+
             return {
                 "status": "healthy",
                 "redis_version": info.get("redis_version"),
                 "used_memory_human": info.get("used_memory_human"),
                 "connected_clients": info.get("connected_clients"),
-                **pool_stats
+                **pool_stats,
             }
         except RedisError as exc:
             logger.error("Redis health check failed: %s", exc)
             raise CacheConnectionError(f"Health check failed: {exc}") from exc
-        
-        
-    # INTERNAL    
+
+    # INTERNAL
     def _assert_connected(self) -> None:
         if self._redis is None:
             raise CacheConnectionError("CacheClient is not connected. Call connect() first.")
-        
+
     def _pool_stats(self) -> dict[str, Any]:
         if self._pool is None:
             return {}
-        stats: dict[str, Any] = {
-            "pool_max_connections": self._pool.max_connections
-        }
+        stats: dict[str, Any] = {"pool_max_connections": self._pool.max_connections}
         created = getattr(self._pool, "_created_connections", None)
         if created is not None:
             stats["pool_created_connections"] = created
         return stats
-    
+
+
 # Singleton accessor
 _cache_client: CacheClient | None = None
+
 
 async def get_cache_client() -> CacheClient:
     global _cache_client

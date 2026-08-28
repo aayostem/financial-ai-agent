@@ -50,8 +50,10 @@ class AnalysisRecord(Base):
             f"agent={self.agent_type} latency={self.latency_ms}ms>"
         )
 
+
 class AnalysisRepository(BaseRepository[AnalysisRecord]):
     model_class = AnalysisRecord
+
     async def record(
         self,
         *,
@@ -68,6 +70,7 @@ class AnalysisRepository(BaseRepository[AnalysisRecord]):
         session_id: UUID | None = None,
     ) -> AnalysisRecord:
         import uuid
+
         record = AnalysisRecord(
             id=uuid.uuid4(),
             ticker=ticker.upper() if ticker else None,
@@ -83,14 +86,10 @@ class AnalysisRepository(BaseRepository[AnalysisRecord]):
             session_id=session_id,
         )
         return await self.add(record)
-    
+
     # Read
     async def get_by_ticker(
-        self,
-        ticker: str,
-        *,
-        limit: int = 50,
-        offset: int = 0
+        self, ticker: str, *, limit: int = 50, offset: int = 0
     ) -> list[AnalysisRecord]:
         try:
             result = await self._session.execute(
@@ -105,11 +104,8 @@ class AnalysisRepository(BaseRepository[AnalysisRecord]):
             raise DatabaseQueryError(
                 f"Failed to fetch analysis history for '{ticker}': {exc}"
             ) from exc
-            
-    async def get_by_session(
-        self,
-        session_id: UUID
-    ) -> list[AnalysisRecord]:
+
+    async def get_by_session(self, session_id: UUID) -> list[AnalysisRecord]:
         try:
             result = await self._session.execute(
                 select(AnalysisRecord)
@@ -121,32 +117,26 @@ class AnalysisRepository(BaseRepository[AnalysisRecord]):
             raise DatabaseQueryError(
                 f"Failed to fetch analysis history for '{session_id}': {exc}"
             ) from exc
-            
+
     async def get_recent(
-        self,
-        *,
-        limit: int =20,
-        agent_type: str | None = None,
-        errors_only: bool = False
+        self, *, limit: int = 20, agent_type: str | None = None, errors_only: bool = False
     ) -> list[AnalysisRecord]:
         try:
             stmt = select(AnalysisRecord).order_by(AnalysisRecord.created_at.desc()).limit(limit)
             if agent_type:
-                stmt=stmt.where(AnalysisRecord.agent_type == agent_type)
+                stmt = stmt.where(AnalysisRecord.agent_type == agent_type)
             if errors_only:
                 stmt = stmt.where(AnalysisRecord.error.isnot(None))
-                
+
             result = await self._session.execute(stmt)
             return list(result.scalars().all())
         except Exception as exc:
             raise DatabaseQueryError(f"Failed to fetch recent analyses: {exc}") from exc
-        
+
         # aggregation
+
     async def average_latency_ms(
-        self,
-        *,
-        ticker: str | None = None,
-        agent_type: str | None = None
+        self, *, ticker: str | None = None, agent_type: str | None = None
     ) -> float | None:
         try:
             stmt = select(func.avg(AnalysisRecord.latency_ms))
@@ -154,7 +144,7 @@ class AnalysisRepository(BaseRepository[AnalysisRecord]):
                 stmt = stmt.where(AnalysisRecord.ticker == ticker.upper())
             if agent_type:
                 stmt = stmt.where(AnalysisRecord.agent_type == agent_type)
-                
+
             result = await self._session.execute(stmt)
             avg = result.scalar_one_or_none()
             return float(avg) if avg is not None else None
@@ -173,14 +163,14 @@ class AnalysisRepository(BaseRepository[AnalysisRecord]):
                 .select_from(AnalysisRecord)
                 .where(AnalysisRecord.error.isnot(None))
             )
-            
+
             if ticker:
                 base_stmt = base_stmt.where(AnalysisRecord.ticker == ticker.upper())
                 error_stmt = error_stmt.where(AnalysisRecord.ticker == ticker.upper())
-                
+
             total = (await self._session.execute(base_stmt)).scalar_one()
             errors = (await self._session.execute(error_stmt)).scalar_one()
-            
+
             return errors / total if total > 0 else 0.0
         except Exception as exc:
             raise DatabaseQueryError(f"Failed to compute error rate: {exc}") from exc

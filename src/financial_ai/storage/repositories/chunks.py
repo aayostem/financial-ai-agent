@@ -15,6 +15,7 @@ from financial_ai.utils.exceptions import DatabaseQueryError, VectorSearchError
 
 logger = logging.getLogger(__name__)
 
+
 # ORM Model
 class FinancialChunk(Base):
     """
@@ -57,28 +58,29 @@ class FinancialChunk(Base):
             f"section={self.section} idx={self.chunk_index}>"
         )
 
+
 # repository
 class ChunksRepository(BaseRepository[FinancialChunk]):
     model_class = FinancialChunk
-    
+
     async def similarity_search(
-        self, 
-        query_embedding: list[float], 
-        *, 
-        ticker: str | None = None, 
-        filing_type: str | None = None, 
-        fiscal_year: int | None = None, 
-        section: str | None = None, 
-        limit: int = 5, 
-        ef_search: int = 100
+        self,
+        query_embedding: list[float],
+        *,
+        ticker: str | None = None,
+        filing_type: str | None = None,
+        fiscal_year: int | None = None,
+        section: str | None = None,
+        limit: int = 5,
+        ef_search: int = 100,
     ) -> list[tuple[FinancialChunk, float]]:
         try:
             await self._session.execute(text(f"SET LOCAL hnsw.ef_search = {int(ef_search)}"))
             distance_col = FinancialChunk.embedding.cosine_distance(query_embedding)
             similarity_col = (1 - distance_col).label("similarity")
-            
+
             stmt = select(FinancialChunk, similarity_col).order_by(distance_col).limit(limit)
-            
+
             if ticker:
                 stmt = stmt.where(FinancialChunk.ticker == ticker.upper())
             if filing_type:
@@ -87,65 +89,65 @@ class ChunksRepository(BaseRepository[FinancialChunk]):
                 stmt = stmt.where(FinancialChunk.fiscal_year == fiscal_year)
             if section:
                 stmt = stmt.where(FinancialChunk.section == section)
-             
+
             result = await self._session.execute(stmt)
             rows = result.all()
             return [(row[0], float(row[1])) for row in rows]
         except Exception as exc:
             raise VectorSearchError(f"Vector similarity search failed: {exc}") from exc
-    
-    
+
     async def mmr_search(
-        self, 
-        query_embedding: list[float], 
-        *, 
-        ticker: str | None = None, 
-        filing_type: str | None = None, 
-        fiscal_year: int | None = None, 
-        limit: int = 5, 
-        fetch_k: int = 20, 
-        lambda_mult: float = 0.5
+        self,
+        query_embedding: list[float],
+        *,
+        ticker: str | None = None,
+        filing_type: str | None = None,
+        fiscal_year: int | None = None,
+        limit: int = 5,
+        fetch_k: int = 20,
+        lambda_mult: float = 0.5,
     ) -> list[tuple[FinancialChunk, float]]:
         candidates = await self.similarity_search(
             query_embedding,
             ticker=ticker,
             filing_type=filing_type,
             fiscal_year=fiscal_year,
-            limit=fetch_k
+            limit=fetch_k,
         )
         if not candidates:
             return []
-        
+
         selected: list[tuple[FinancialChunk, float]] = []
         remaining = list(candidates)
-        
+
         while remaining and len(selected) < limit:
             best_idx = 0
             best_score = float("-inf")
-            
+
             for i, (chunk, sim_score) in enumerate(remaining):
                 if not selected:
                     mmr_score = sim_score
                 else:
                     max_redundancy = max(
-                        self._cosine_similarity(chunk.embedding, sel_chunk.embedding) for sel_chunk, _ in selected
+                        self._cosine_similarity(chunk.embedding, sel_chunk.embedding)
+                        for sel_chunk, _ in selected
                     )
                     mmr_score = lambda_mult * sim_score - (1 - lambda_mult) * max_redundancy
-                    
+
                 if mmr_score > best_score:
                     best_score = mmr_score
                     best_idx = i
-                    
+
             selected.append(remaining.pop(best_idx))
         return selected
-    
-    async def bulk_upsert(self, chunks: list[FinancialChunk])-> int:
+
+    async def bulk_upsert(self, chunks: list[FinancialChunk]) -> int:
         if not chunks:
             return 0
-        
+
         try:
             from sqlalchemy.dialects.postgresql import insert as pg_insert
-            
+
             stmt = pg_insert(FinancialChunk).values(
                 [
                     {
@@ -178,43 +180,42 @@ class ChunksRepository(BaseRepository[FinancialChunk]):
                     "model_version": stmt.excluded.model_version,
                 },
             )
-            
+
             result = await self._session.execute(stmt)
             await self._session.flush()
             logger.info("Bulk upserted %d chunks", len(chunks))
             return result.rowcount
-        
+
         except Exception as exc:
             raise DatabaseQueryError(f"Bulk upsert of {len(chunks)} chunks failed: {exc}") from exc
-        
+
     # filtered retrieval
     async def get_by_filing(
-        self,
-        filing_id: UUID,
-        *,
-        section: str | None = None
+        self, filing_id: UUID, *, section: str | None = None
     ) -> list[FinancialChunk]:
         try:
             stmt = (
-                select(FinancialChunk).where(FinancialChunk.filing_id == filing_id).order_by(FinancialChunk.chunk_index)
+                select(FinancialChunk)
+                .where(FinancialChunk.filing_id == filing_id)
+                .order_by(FinancialChunk.chunk_index)
             )
             if section:
                 stmt = stmt.where(FinancialChunk.section == section)
-                
+
             result = await self._session.execute(stmt)
             return list(result.scalars().all())
         except Exception as exc:
             raise DatabaseQueryError(
                 f"Failed to fetch chunks for filing {filing_id}: {exc}"
             ) from exc
-            
+
     async def count_by_ticker(self, ticker: str) -> int:
         try:
             result = await self._session.execute(
                 select(func.count())
                 .select_from(FinancialChunk)
                 .where(FinancialChunk.ticker == ticker.upper())
-            )      
+            )
             return result.scalar_one()
         except Exception as exc:
             raise DatabaseQueryError(
@@ -222,12 +223,12 @@ class ChunksRepository(BaseRepository[FinancialChunk]):
             ) from exc
 
     # INTERNAL
-    
+
     @staticmethod
     def _cosine_similarity(a: list[float], b: list[float]) -> float:
-        dot = sum(x * y for x,y in zip(a,b, strict=False))
-        norm_a = sum(x * x for x in a ) ** 0.5
-        norm_b = sum(y * y for y in a ) ** 0.5
-        if norm_a ==0 or norm_b == 0:
+        dot = sum(x * y for x, y in zip(a, b, strict=False))
+        norm_a = sum(x * x for x in a) ** 0.5
+        norm_b = sum(y * y for y in a) ** 0.5
+        if norm_a == 0 or norm_b == 0:
             return 0.0
         return float(dot / (norm_a * norm_b))

@@ -9,5 +9,5 @@ __all__ = [
     "HybridSearcher",
     "QueryEngine",
     "QueryResult",
-    RetrievalResult
+    RetrievalResult,
 ]

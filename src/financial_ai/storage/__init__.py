@@ -22,5 +22,5 @@ __all__ = [
     "build_key",
     "get_cache_client",
     "get_db_client",
-    "get_session"
+    "get_session",
 ]

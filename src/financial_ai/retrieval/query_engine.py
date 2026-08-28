@@ -69,6 +69,7 @@ class QueryResult:
             f"latency={self.latency_ms}ms>"
         )
 
+
 # QUERY ENGINE
 class QueryEngine:
     def __init__(self, vector_store: VectorStore | None = None) -> None:
@@ -77,39 +78,39 @@ class QueryEngine:
         self._retriever = DocumentRetriever(vs)
         self._hybrid = HybridSearcher()
         self._llm = self._build_llm_client()
-        
+
     def _build_llm_client(self) -> AsyncOpenAI | None:
         if self._settings.MOCK_EXTERNAL_APIS:
             logger.info("QueryEngine: LLM calls mocked (MOCK_EXTERNAL_APIS=True)")
             return None
-        
+
         # TRY GROQ FIRST
         if self._settings.GROQ_API_KEY:
             logger.debug("QueryEngine: Using GROQ_API_KEY for LLM")
             return AsyncOpenAI(
                 api_key=self._settings.GROQ_API_KEY.get_secret_value(),
                 base_url=self._settings.LLM_BASE_URL or "https://api.groq.com/openai/v1",
-                timeout=self._settings.LLM_REQUEST_TIMEOUT
+                timeout=self._settings.LLM_REQUEST_TIMEOUT,
             )
-        
+
         # Use OpenAI
         if self._settings.OPENAI_API_KEY:
             logger.debug("QueryEngine: Using OPENAI_API_KEY for LLM (fallback)")
             return AsyncOpenAI(
                 api_key=self._settings.OPENAI_API_KEY.get_secret_value(),
                 base_url=self._settings.LLM_BASE_URL or "https://api.openai.com/v1",
-                timeout=self._settings.LLM_REQUEST_TIMEOUT
+                timeout=self._settings.LLM_REQUEST_TIMEOUT,
             )
-        
+
         # NO API AVAILABLE
         logger.warning(
             "QueryEngine: No API Key available for LLM. "
             "Set GROQ_API_KEY (preferred) or OPENAI_API_KEY."
         )
         return None
-    
+
     # PUBLIC API
-    
+
     async def query(
         self,
         question: str,
@@ -125,10 +126,10 @@ class QueryEngine:
         if not question or not question.strip():
             raise ValueError("Question cannot be empty")
         t0 = time.monotonic()
-        
+
         if analysis_style not in _SYSTEM_PROMPTS:
             analysis_style = _DEFAULT_STYLE
-            
+
         try:
             # step 1: retrieve
             results = await self.retrieve(
@@ -138,7 +139,7 @@ class QueryEngine:
                 fiscal_year=fiscal_year,
                 section=section,
                 search_type=search_type,
-                limit=limit
+                limit=limit,
             )
             # step 2 auto upgrade to hybrid if vector confidence is low
             if (
@@ -149,7 +150,7 @@ class QueryEngine:
                 logger.info(
                     "Low vector confidence (%.3f < %.3f) - upgrading to hybrid",
                     results[0].score,
-                    self._settings._VECTOR_SEARCH_THRESHOLD
+                    self._settings._VECTOR_SEARCH_THRESHOLD,
                 )
                 results = await self._hybrid.search(
                     question,
@@ -159,7 +160,7 @@ class QueryEngine:
                     limit=limit or self._settings.TOP_K_RESULTS,
                 )
                 search_type = "hybrid"
-            
+
             if not results:
                 return QueryResult(
                     question=question,
@@ -177,24 +178,22 @@ class QueryEngine:
 
             # step 3: build context
             context = self._retriever.build_context(results)
-            
+
             # step 4: Generate answer
             answer = await self._generate_answer(
-                question=question,
-                context=context,
-                analysis_style=analysis_style
+                question=question, context=context, analysis_style=analysis_style
             )
-            
+
             latency_ms = int((time.monotonic() - t0) * 1000)
-            
+
             logger.info(
                 "Query complete - style=%s search=%s sources=%d latency=%dms",
                 analysis_style,
                 search_type,
                 len(results),
-                latency_ms
+                latency_ms,
             )
-            
+
             return QueryResult(
                 question=question,
                 answer=answer,
@@ -202,9 +201,9 @@ class QueryEngine:
                 search_type=search_type,
                 agent_type="query_engine",
                 latency_ms=latency_ms,
-                source_documents=results
+                source_documents=results,
             )
-        
+
         except Exception as exc:
             latency_ms = int((time.monotonic() - t0) * 1000)
             logger.error("Query failed after %dms: %s", latency_ms, exc)
@@ -215,9 +214,9 @@ class QueryEngine:
                 search_type=search_type,
                 agent_type="query_engine",
                 latency_ms=latency_ms,
-                error=str(exc)
+                error=str(exc),
             )
-            
+
     # INTERNAL
     async def _retrieve(
         self,
@@ -238,7 +237,7 @@ class QueryEngine:
                 fiscal_year=fiscal_year,
                 limit=limit or self._settings.TOP_K_RESULTS,
             )
-        
+
         return await self._retriever.retrieve(
             question,
             ticker=ticker,
@@ -246,28 +245,22 @@ class QueryEngine:
             fiscal_year=fiscal_year,
             section=section,
             search_type=search_type,
-            limit=limit
+            limit=limit,
         )
-    
-    async def _generate_answer(
-        self,
-        *,
-        question: str,
-        context: str,
-        analysis_style: str
-    ) -> str:
+
+    async def _generate_answer(self, *, question: str, context: str, analysis_style: str) -> str:
         if self._llm is None:
             return f"[LLM unavailable - returning raw context]\n\n{context}"
-        
+
         system_prompt = _SYSTEM_PROMPTS.get(analysis_style, _SYSTEM_PROMPTS[_DEFAULT_STYLE])
-        
+
         user_message = (
             f"Using only the following financial document excerpts, "
             f"answer this question:\n\n"
             f"Question: {question}\n\n"
             f"Context: \n{context}"
         )
-        
+
         try:
             response = await self._llm.chat.completions.create(
                 model=self._settings.LLM_MODEL,
@@ -276,9 +269,9 @@ class QueryEngine:
                     {"role": "user", "content": user_message},
                 ],
                 temperature=self._settings.LLM_TEMPERATURE,
-                max_tokens=self._settings.LLM_MAX_TOKENS
+                max_tokens=self._settings.LLM_MAX_TOKENS,
             )
             return response.choices[0].message.content or ""
-        
+
         except Exception as exc:
             raise RetrievalError(f"LLM generation failed: {exc}") from exc

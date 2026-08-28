@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 # Enums
 
+
 class AnalysisStyle(StrEnum):
     ANALYST = "analyst"
     EXECUTIVE = "executive"
@@ -20,6 +21,7 @@ class SearchType(StrEnum):
 
 
 # Query
+
 
 class QueryRequest(BaseModel):
     question: str = Field(..., description="The financial question to analyse")
@@ -59,6 +61,7 @@ class QueryResponse(BaseModel):
 
 # Ingestion
 
+
 class IngestionRequest(BaseModel):
     ticker: str = Field(..., description="Stock ticker symbol (e.g. AAPL)")
     filing_type: str = Field(default="10-K", description="SEC form type")
@@ -77,6 +80,7 @@ class IngestionResponse(BaseModel):
 
 # Health
 
+
 class ServiceStatus(BaseModel):
     """Status of a single backing service."""
 
@@ -91,6 +95,7 @@ class HealthResponse(BaseModel):
 
 
 # Stats
+
 
 class StatsResponse(BaseModel):
     ticker: str | None

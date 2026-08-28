@@ -13,8 +13,9 @@ from financial_ai.utils.exceptions import RetrievalError
 
 if TYPE_CHECKING:
     from financial_ai.storage.repositories.chunks import FinancialChunk
-    
+
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class RetrievalResult:
@@ -57,12 +58,13 @@ class RetrievalResult:
             metrics=chunk.metrics or {},
         )
 
+
 # DocumentRetriever
 class DocumentRetriever:
     def __init__(self, vector_store: VectorStore | None = None) -> None:
         self._settings = get_settings()
         self._vector_store = vector_store or VectorStore()
-        
+
     async def retrieve(
         self,
         question: str,
@@ -82,24 +84,18 @@ class DocumentRetriever:
             if score_threshold is not None
             else self._settings.VECTOR_SEARCH_THRESHOLD
         )
-        
+
         # cache check
         cache_key = None
         if use_cache and not self._settings.MOCK_EXTERNAL_APIS:
             cache_key = self._build_cache_key(
-                question,
-                ticker,
-                filing_type,
-                fiscal_year,
-                section,
-                effective_limit,
-                search_type
+                question, ticker, filing_type, fiscal_year, section, effective_limit, search_type
             )
             cached = await self._get_cached(cache_key)
             if cached is not None:
                 logger.debug("Cache hit for query hash=%s", cache_key[-8:])
                 return cached
-            
+
         # vector search
         try:
             raw_results = await self._vector_store.search(
@@ -109,20 +105,20 @@ class DocumentRetriever:
                 fiscal_year=fiscal_year,
                 section=section,
                 limit=effective_limit,
-                search_type=search_type
+                search_type=search_type,
             )
         except Exception as exc:
             raise RetrievalError(
                 f"Vector search failed for question='{question[:50]}...':{exc}"
             ) from exc
-        
+
         # score filtering
         results = [
             RetrievalResult.from_chunk(chunk, score)
             for chunk, score in raw_results
             if score >= effective_threshold
         ]
-        
+
         logger.info(
             "Retrieved %d/%d results above threshold=%.2f for %s...",
             len(results),
@@ -130,48 +126,44 @@ class DocumentRetriever:
             effective_threshold,
             question[:50],
         )
-        
+
         # cache population
         if use_cache and cache_key and results:
             await self._set_cached(cache_key, results)
-            
+
         return results
-    
-    
+
     def build_context(
-        self,
-        results: list[RetrievalResult],
-        *,
-        max_tokens: int | None = None
+        self, results: list[RetrievalResult], *, max_tokens: int | None = None
     ) -> str:
         import tiktoken
+
         budget = max_tokens or self._settings.MAX_CONTEXT_TOKENS
         enc = tiktoken.get_encoding("cl100k_base")
-        
+
         context_parts: list[str] = []
         tokens_used = 0
-        
+
         for result in results:
             block = result.to_context_string()
             block_tokens = len(enc.encode(block))
-            
+
             if tokens_used + block_tokens > budget:
                 logger.debug(
                     "Context budget reached at %d/%d tokens after %d chunks",
                     tokens_used,
                     budget,
-                    len(context_parts)
+                    len(context_parts),
                 )
                 break
-            
+
             context_parts.append(block)
             tokens_used += block_tokens
-            
+
         return "\n\n---\n\n".join(context_parts)
 
-    
     # INTERNAL
-    
+
     def _build_cache_key(
         self,
         question: str,
@@ -180,7 +172,7 @@ class DocumentRetriever:
         fiscal_year: int | None,
         section: str | None,
         limit: int,
-        search_type: str
+        search_type: str,
     ) -> str:
         payload = json.dumps(
             {
@@ -190,13 +182,13 @@ class DocumentRetriever:
                 "fy": fiscal_year,
                 "s": section,
                 "l": limit,
-                "st": search_type
+                "st": search_type,
             },
-            sort_keys=True
+            sort_keys=True,
         )
         digest = hashlib.sha256(payload.encode()).hexdigest()
         return build_key(NS_QUERY, digest)
-    
+
     async def _get_cached(self, cache_key: str) -> list[RetrievalResult] | None:
         try:
             client = await get_cache_client()
@@ -207,12 +199,8 @@ class DocumentRetriever:
         except Exception as exc:
             logger.warning("Cache GET failed (non-fatal): %s", exc)
             return None
-        
-    async def _set_cached(
-        self,
-        cache_key: str,
-        results: list[RetrievalResult]
-    ) -> None:
+
+    async def _set_cached(self, cache_key: str, results: list[RetrievalResult]) -> None:
         try:
             client = await get_cache_client()
             serializable = [
@@ -224,7 +212,7 @@ class DocumentRetriever:
                     "fiscal_year": r.fiscal_year,
                     "section": r.section,
                     "score": r.score,
-                    "metrics": r.metrics
+                    "metrics": r.metrics,
                 }
                 for r in results
             ]

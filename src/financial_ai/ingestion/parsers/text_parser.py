@@ -24,21 +24,22 @@ _NUMBER_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(\d)\s+%"), r"\1%"),
 ]
 
+
 class TextParser:
     def clean(self, text: str) -> str:
         if not text or not text.strip():
             return ""
-        
+
         text = unicodedata.normalize("NFKC", text)
-        
+
         for pattern in _NOISE_PATTERNS:
             text = pattern.sub(" ", text)
-            
+
         lines = []
         for line in text.splitlines():
             line = re.sub(r"[ \t]+", " ", line).strip()
             lines.append(line)
-            
+
         cleaned_lines: list[str] = []
         blank_count = 0
         for line in lines:
@@ -49,17 +50,17 @@ class TextParser:
             else:
                 blank_count = 0
                 cleaned_lines.append(line)
-        return  "\n".join(cleaned_lines).strip()
-                
+        return "\n".join(cleaned_lines).strip()
+
     def normalize_numbers(self, text: str) -> str:
         text = re.sub(r"\$\s*", "", text)
         text = text.replace(",", "")
         text = re.sub(r"(\d)\s+%", r"\1%", text)
         return text
-    
+
     def extract_metrics(self, text: str) -> dict[str, float]:
         metrics: dict[str, float] = {}
-        
+
         def _safe_float(raw: str) -> float | None:
             cleaned = raw.replace(",", "").strip()
             if not cleaned:
@@ -68,6 +69,7 @@ class TextParser:
                 return float(cleaned)
             except ValueError:
                 return None
+
         revenue_match = re.search(
             r"(?:revenue|net\s+revenue|total\s+revenue)[^\d]*"
             r"([\d,]+(?:\.\d+)?)\s*"
@@ -118,8 +120,8 @@ class TextParser:
                 metrics["margin_pct"] = value
 
         return metrics
-        
-        
+
+
 def _apply_scale(value: float, scale: str) -> float:
     """Convert a scaled value to its full numeric form."""
     scale = scale.lower()
