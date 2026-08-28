@@ -36,6 +36,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  dependency-scan:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit dependencies
+        run: pip-audit --requirement <(pip freeze) || true
+
   # LINT & TYPE CHECK
   lint:
     name: Lint & Type Check
@@ -143,7 +161,7 @@ jobs:
           POSTGRES_DB: financial_ai_test
           REDIS_HOST: localhost
           REDIS_PASSWORD: ""
-        run: pytest tests/ -v --tb=short -x -m "not slow" || true
+        run: pytest tests/ -v --tb=short -x -m "not slow"
 
   # BUILD & PUSH DOCKER IMAGE
   build:
@@ -170,12 +188,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }/${{env.IMAGE_NAME }}}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix=sha-
-            type=raw, value=latest,enable=true
+            type=raw,value=latest,enable=true
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
       - name: Build and push
