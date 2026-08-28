@@ -320,6 +320,7 @@ class FinancialAgent:
             all_tool_calls,
             reasoning_steps,
         )
+
     async def _execute_tool(
         self,
         tool_name: str,
@@ -340,7 +341,6 @@ class FinancialAgent:
         except Exception as exc:
             logger.warning("Tool %s failed: %s", tool_name, exc)
             return f"Tool call failed: {exc}", []
-    
 
     async def _tool_search_filings(
         self, args: dict[str, Any], *, default_ticker: str | None, default_year: int | None

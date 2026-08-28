@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import Any
 
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from financial_ai.config import get_settings
 from financial_ai.utils.exceptions import EmbeddingError
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
