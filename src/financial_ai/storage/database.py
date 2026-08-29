@@ -146,7 +146,7 @@ class DatabaseClient:
         try:
             async with self._engine.connect() as conn:
                 result = await conn.execute(
-                    text("SELECT extname FROM pg_extension WHERE extname = 'vector")
+                    text("SELECT extname FROM pg_extension WHERE extname = 'vector'")
                 )
                 installed = result.scalar is not None
                 if installed:

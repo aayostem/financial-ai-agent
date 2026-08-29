@@ -11,19 +11,21 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Copy ONLY pyproject.toml (remove README.md)
-COPY pyproject.toml ./
+# Copy only dependency files first for layer caching
+COPY pyproject.toml README.md ./
 
 # Create virtual environment and install dependencies
 RUN python -m venv /app/venv && \
     /app/venv/bin/pip install --upgrade pip setuptools wheel && \
-    /app/venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu --no-cache-dir
+    /app/venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu --no-cache-dir && \
+    /app/venv/bin/pip install -e "." --no-cache-dir --timeout 1000
 
-# Install dependencies from pyproject.toml without installing the package itself
-RUN /app/venv/bin/pip install $(/app/venv/bin/python -c "import tomllib; print(' '.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))") --no-cache-dir --timeout 1000
-
-# Copy source code
+# Copy source code after dependencies (frequent changes won't bust cache)
 COPY src/ ./src/
+
+# Re-install in editable mode to ensure src is linked
+RUN /app/venv/bin/pip install --no-deps -e "."
+
 
 # ── Stage 2: production ───────────────────────────────────────────────────────
 FROM python:3.11-slim-bookworm AS production
@@ -45,6 +47,7 @@ RUN groupadd -r finrag && useradd -r -g finrag finrag && \
 # Copy virtual environment and source code from builder
 COPY --from=builder --chown=finrag:finrag /app/venv /app/venv
 COPY --from=builder --chown=finrag:finrag /app/src /app/src
+COPY --from=builder --chown=finrag:finrag /app/pyproject.toml /app/pyproject.toml
 
 ENV PATH="/app/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \

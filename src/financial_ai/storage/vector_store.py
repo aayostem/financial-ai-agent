@@ -122,6 +122,7 @@ class VectorStore:
                 )
             else:
                 return await repo.similarity_search(
+                    query_embedding,
                     ticker=ticker,
                     filing_type=filing_type,
                     fiscal_year=fiscal_year,

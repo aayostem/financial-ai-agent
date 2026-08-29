@@ -1,0 +1,22 @@
+apiVersion: v2
+name: financial-ai-agent
+description: |
+  Production Helm chart for the Financial AI Agent - a multi agent system
+  for SEC EDGAR ingestion, hybrid vector retrieval, and LLM-powered financial
+  Q&A
+type: application
+version: 0.1.0
+appVersion: "1.16.0"
+
+keywords:
+  - ai
+  - rag
+  - fintech
+  - llm
+  - fastapi
+
+maintainers:
+  - name: aayostem
+    email: aayo.software@gmail.com
+
+dependencies: []

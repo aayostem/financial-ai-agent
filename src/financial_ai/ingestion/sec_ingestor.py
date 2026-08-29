@@ -18,9 +18,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _EDGAR_BASE = "https://data.sec.gov"
-_EDGAR_SEARCH = "https//efts.sec.gov/LATEST/search-index"
+_EDGAR_SEARCH = "https://efts.sec.gov/LATEST/search-index"
 _EDGAR_FILINGS = f"{_EDGAR_BASE}/submissions"
-_EDGAR_ARCHIVES = "https://www.sec.gov/Archives/edgar/date"
+_EDGAR_ARCHIVES = "https://www.sec.gov/Archives/edgar/data"
 
 SUPPORTED_FILING_TYPES = frozenset({"10-K", "10-Q", "8-K", "20-F", "DEF 14A", "S-1"})
 
@@ -224,7 +224,7 @@ class SECIngestor:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    async def _fetch_document(self, url: str) -> dict:
+    async def _fetch_document(self, url: str) -> str:
         try:
             async with self._rate_limiter:
                 response = await self._client.get(url, headers={"Host": "www.sec.gov"})

@@ -35,10 +35,7 @@ Quantify risks where possible. Flag any material concerns explicitly.""",
 
 _DEFAULT_STYLE = "analyst"
 
-
-# =============================================================================
 # Query result
-# =============================================================================
 
 
 @dataclass
@@ -150,7 +147,7 @@ class QueryEngine:
                 logger.info(
                     "Low vector confidence (%.3f < %.3f) - upgrading to hybrid",
                     results[0].score,
-                    self._settings._VECTOR_SEARCH_THRESHOLD,
+                    self._settings.VECTOR_SEARCH_THRESHOLD,
                 )
                 results = await self._hybrid.search(
                     question,

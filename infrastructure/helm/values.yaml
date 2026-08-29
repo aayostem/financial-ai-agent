@@ -1,0 +1,213 @@
+global:
+  image:
+    registry: ""
+    pullPolicy: IfNotPresent
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# namespace
+namespace: financial-ai
+
+# API - fastapi service
+api:
+  enabled: true
+  image:
+    repository: financial-ai-agent
+    tag: latest
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  service:
+    type: ClusterIP
+    port: 8000
+  ingress:
+    enabled: false
+    className: alb
+    annotations: {}
+    host: ""
+    tls: []
+  env:
+    LOG_LEVEL: "info"
+    WORKERS: "2"
+  envFrom:
+    - secretRef:
+        name: financial-ai-secrets
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Agent pool - function calling
+agentPool:
+  enabled: true
+  image:
+    repository: financial-ai-agent
+    tag: latest
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+  env:
+    AGENT_CONCURRENCY: "4"
+    LOG_LEVEL: "info"
+  envFrom:
+    - secretRef:
+        name: financial-ai-secrets
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8001
+    initialDelaySeconds: 20
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8001
+    initialDelaySeconds: 15
+    periodSeconds: 15
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 65
+    targetMemoryUtilizationPercentage: 75
+
+# Ingestion Cronjob
+ingestion:
+  enabled: true
+  image:
+    repository: financial-ai-agent
+    tag: latest
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  restartPolicy: OnFailure
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  env:
+    INGESTION_BATCH_SIZE: "50"
+    LOG_LEVEL: "info"
+  envFrom:
+    - secretRef:
+        name: financial-ai-secrets
+
+# pgvector - PostgreSQL 16
+pgvector:
+  enabled: true
+  image:
+    repository: pgvector/pgvector
+    tag: "pg16"
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+  storage:
+    storageClassName: gp3
+    size: 50Gi
+  service:
+    port: 5432
+  env:
+    POSTGRES_DB: financial_ai
+    POSTGRES_USER: aiuser
+  envFrom:
+    - secretRef:
+        name: financial-ai-secrets
+  persistence:
+    enabled: true
+  livenessProbe:
+    exec:
+      command: ["pg_isready", "-U", "aiuser", "-d", "financial_ai"]
+    initialDelaySeconds: 30
+    periodSeconds: 20
+  readinessProbe:
+    exec:
+      command: ["pg_isready", "-U", "aiuser", "-d", "financial_ai"]
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Redis 7
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  storage:
+    storageClassName: gp3
+    size: 10Gi
+  service:
+    port: 6379
+  args:
+    - "--appendonly"
+    - "yes"
+    - "--maxmemory"
+    - "400mb"
+    - "--maxmemory-policy"
+    - "allkeys-lru"
+  livenessProbe:
+    exec:
+      command: ["redis-cli", "ping"]
+    initialDelaySeconds: 10
+    periodSeconds: 15
+  readinessProbe:
+    exec:
+      command: ["redis-cli", "ping"]
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+# HTTPRoute
+httpRoute:
+  enabled: false
+
+# Ingress
+ingress:
+  enabled: false

@@ -1,0 +1,116 @@
+{{- if .Values.pgvector.enabled }}
+---
+# pgvector — StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "financial-ai-agent.fullname" . }}-pgvector
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "financial-ai-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgvector
+spec:
+  serviceName: {{ include "financial-ai-agent.fullname" . }}-pgvector-headless
+  replicas: {{ .Values.pgvector.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "financial-ai-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: pgvector
+  template:
+    metadata:
+      labels:
+        {{- include "financial-ai-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: pgvector
+    spec:
+      securityContext:
+        runAsUser: 999
+        fsGroup: 999
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: pgvector
+          image: {{ include "financial-ai-agent.image" (dict "global" .Values.global "image" .Values.pgvector.image) }}
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            {{- range $k, $v := .Values.pgvector.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          {{- with .Values.pgvector.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.pgvector.resources | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.pgvector.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.pgvector.readinessProbe | nindent 12 }}
+          volumeMounts:
+            - name: pgdata
+              subPath: pgdata
+              mountPath: /var/lib/postgresql/data
+  {{- if .Values.pgvector.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+        labels:
+          {{- include "financial-ai-agent.labels" . | nindent 10 }}
+          app.kubernetes.io/component: pgvector
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.pgvector.storage.storageClassName }}
+        resources:
+          requests:
+            storage: {{ .Values.pgvector.storage.size }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "financial-ai-agent.fullname" . }}-pgvector-headless
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "financial-ai-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgvector
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    {{- include "financial-ai-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: pgvector
+  ports:
+    - name: postgres
+      port: {{ .Values.pgvector.service.port }}
+      targetPort: postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "financial-ai-agent.fullname" . }}-pgvector
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "financial-ai-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pgvector
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "financial-ai-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: pgvector
+  ports:
+    - name: postgres
+      port: {{ .Values.pgvector.service.port }}
+      targetPort: postgres
+{{- end }}

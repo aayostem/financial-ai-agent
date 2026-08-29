@@ -4,7 +4,7 @@
 .venv
 venv/
 env/
-financial-rag-env/
+financial-ai-env/
 
 # Data
 data/

@@ -122,27 +122,6 @@ async def query(request: QueryRequest, engine: Engine) -> QueryResponse:
     if result.error and not result.answer:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result.error)
 
-    # write to analysis history
-    try:
-        from financial_ai.storage.repositories.analysis import AnalysisRepository
-
-        db = await get_db_client()
-        async with db.session() as session:
-            repo = AnalysisRepository(session)
-            await repo.create(
-                ticker=request.ticker,
-                question=request.question,
-                answer=result.answer,
-                analysis_style=result.analysis_style,
-                agent_type=result.agent_type,
-                search_type=result.search_type,
-                latency_ms=result.latency_ms,
-                source_chunk_ids=[UUID(r.chunk_id) for r in result.source_documents],
-                error=result.error,
-            )
-    except Exception as exc:
-        logger.warning("Failed to write analysis_history (non-fatal): %s", exc)
-
     source_docs = [
         DocumentResponse(
             chunk_id=r.chunk_id,
@@ -222,7 +201,7 @@ async def _ingest_background(
 
     try:
         async with SECIngestor() as ingestor:
-            filings = await ingestor.list_filings(ticker, filing_type, year=years)
+            filings = await ingestor.list_filings(ticker, filing_type, years=years)
             total_filings = len(filings)
 
             raw_dir = settings.RAW_DATA_DIR / ticker / filing_type
@@ -230,13 +209,13 @@ async def _ingest_background(
 
             for meta in filings:
                 try:
-                    raw_html, file_hash = await ingestor.download_filing(meta, raw_dir=raw_dir)
+                    raw_html, file_hash = await ingestor.download_filings(meta, raw_dir=raw_dir)
                 except Exception as exc:
                     logger.error(
                         "Failed to download %s FY%s: %s", meta.filing_type, meta.fiscal_year, exc
                     )
                     continue
-                parsed = html_parser(
+                parsed = html_parser.parse(
                     raw_html, ticker=ticker, filing_type=filing_type, fiscal_year=meta.fiscal_year
                 )
                 for section in parsed.sections:

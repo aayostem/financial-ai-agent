@@ -1,0 +1,31 @@
+{{- if and .Values.api.enabled .Values.api.ingress.enabled }}
+---
+# API — AWS ALB Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "financial-ai-agent.fullname" . }}-api
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "financial-ai-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  annotations:
+    {{- toYaml .Values.api.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.api.ingress.className }}
+  {{- if .Values.api.ingress.tls }}
+  tls:
+    {{- toYaml .Values.api.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.api.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "financial-ai-agent.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.service.port }}
+{{- end }}
